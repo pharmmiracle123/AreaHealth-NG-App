@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AreaHealth — Smart Healthcare Access (Full)</title>
+
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          skybrand: '#38bdf8',
+          skybrand600: '#0ea5e9',
+        }
+      }
+    }
+  }
+</script>
+
+<!-- Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/boxicons/2.1.4/css/boxicons.min.css" />
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- SheetJS -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- jsPDF + autotable -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+<!-- html5-qrcode for barcode scanning (alternatively use Quagga) -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+<!-- Paystack -->
+<script src="https://js.paystack.co/v1/inline.js"></script>
+
+<!-- Firebase (compat for simpler single-file) -->
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-messaging-compat.js"></script>
+
+<style>
+  html,body,#app { height: 100%; }
+  .sidebar { min-width: 80px; max-width: 320px; }
+  #map { height: 240px; }
+  .scroll-y { overflow-y:auto; -webkit-overflow-scrolling: touch; }
+  /* simple dark-mode helper when toggled via JS */
+  .dark-bg { background: linear-gradient(180deg,#0f172a,#071024); color: #d1d5db; }
+</style>
+</head>
+<body class="bg-sky-50 text-gray-900 antialiased" id="body">
+
+<!-- MAIN APP -->
+<div id="app" class="min-h-screen flex">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="sidebar bg-white dark:bg-slate-800 shadow-md p-4 hidden lg:block">
+    <!-- Logo area (replace logo-<panel> sources with your custom logos if desired) -->
+    <div class="flex items-center gap-3 mb-4">
+      <img id="globalLogo" src="logo.png" alt="AreaHealth" class="w-12 h-12 rounded-full object-cover border" onerror="this.src='https://via.placeholder.com/80x80?text=Logo'"/>
+      <div>
+        <div class="text-xl font-bold text-skybrand">AreaHealth</div>
+        <div class="text-xs text-gray-500">Smart Healthcare Access</div>
+      </div>
+    </div>
+
+    <!-- Hello / small user card -->
+    <div id="miniUserCard" class="bg-sky-50 p-3 rounded-lg mb-4">
+      <div class="flex items-center gap-3">
+        <img id="miniAvatar" src="logo.png" alt="avatar" class="w-10 h-10 rounded-full border" onerror="this.src='https://via.placeholder.com/80x80?text=U'"/>
+        <div>
+          <div id="miniName" class="font-semibold text-sm">Hello, Guest</div>
+          <div id="miniEmail" class="text-xs text-gray-500">Not logged in</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Many sidebar items (each with replaceable logo area) -->
+    <nav class="space-y-2 text-sm">
+      <button class="w-full nav-btn flex items-center gap-3 p-2 rounded hover:bg-sky-50" data-panel="dashboard">
+        <img src="logo-dashboard.png" class="w-6 h-6 object-cover rounded" onerror="this.src='https://via.placeholder.com/24x24?text=D'"/>
+        <span>Dashboard</span>
+      </button>
+
+      <button class="w-full nav-btn flex items-center gap-3 p-2 rounded hover:bg-sky-50" data-panel="search">
+        <img src="logo-search.png" class="w-6 h-6 object-cover rounded" onerror="this.src='https://via.placeholder.com/24x24?text=S'"/>
+        <span>Search Drugs</span>
+      </button>
+
+      <button class="w-full nav-btn flex items-center gap-3 p-2 rounded hover:bg-sky-50" data-panel="map">
+        <img src="logo-map.png" class="w-6 h-6 object-cover rounded" onerror="this.src='https://via.placeholder.com/24x24?text=M'"/>
+        <span>Map (Nearby)</span>
+      </button>
+
+      <button class="w-full nav-btn flex items-center gap-3 p-2 rounded hover:bg-sky-50" data-panel="scanner">
+        <img src="logo-scan.png" class="w-6 h-6 object-cover rounded" onerror="this.src='https://via.placeholder.com/24x24?text=C'"/>
+        <span>Barcode Scan</span>
+      </button>
+
+      <button class="w-full nav-btn flex items-center gap-3 p-2 rounded hover:bg-sky-50" data-panel="inventory">
+        <img src="logo-inv.png" class="w-6 h-6 object-cover rounded" onerror="this.src='https://via.placeholder.com/24x24?text=I'"/>
+        <span>Inventory</span>
+      </button>
+
+      <button class="w-full nav-btn flex items-center gap-3 p-2 rounded hover:bg-sky-50" data-panel="orders">
+        <img src="logo-orders.png" class="w-6 h-6 object-cover rounded" onerror="this.src='https://via.placeholder.com/24x24?text=O'"/>
+        <span>Orders</span>
+      </button>
+
+      <button class="w-full nav-btn flex items-center gap-3 p-2 rounded hover:bg-sky-50" data-panel="pharmacies">
+        <img src="logo-pharm.png" class="w-6 h-6 object-cover rounded" onerror="this.src='https://via.placeholder.com/24x24?text=P'"/>
+        <span>Pharmacies</span>
+      </button>
+
+      <button class="w-full nav-btn flex items-center gap-3 p-2 rounded hover:bg-sky-50" data-panel="analytics">
+        <img src="logo-analytics.png" class="w-6 h-6 object-cover rounded" onerror="this.src='https://via.placeholder.com/24x24?text=A'"/>
+        <span>Admin Analytics</span>
+      </button>
+
+      <button class="w-full nav-btn flex items-center gap-3 p-2 rounded hover:bg-sky-50" data-panel="export">
+        <img src="logo-export.png" class="w-6 h-6 object-cover rounded" onerror="this.src='https://via.placeholder.com/24x24?text=E'"/>
+        <span>Export (Excel/PDF)</span>
+      </button>
+
+      <button class="w-full nav-btn flex items-center gap-3 p-2 rounded hover:bg-sky-50" data-panel="chatbot">
+        <img src="logo-chat.png" class="w-6 h-6 object-cover rounded" onerror="this.src='https://via.placeholder.com/24x24?text=C'"/>
+        <span>AI Chatbot</span>
+      </button>
+
+      <button class="w-full nav-btn flex items-center gap-3 p-2 rounded hover:bg-sky-50" data-panel="profile">
+        <img src="logo-user.png" class="w-6 h-6 object-cover rounded" onerror="this.src='https://via.placeholder.com/24x24?text=U'"/>
+        <span>Profile</span>
+      </button>
+    </nav>
+
+    <!-- Bottom quick actions -->
+    <div class="mt-6 space-y-2">
+      <button id="darkToggle" class="w-full p-2 rounded border">Toggle Dark Mode</button>
+      <button id="logout" class="w-full p-2 rounded bg-red-500 text-white">Sign out</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="flex-1 p-4 md:p-6">
+    <!-- Topbar for mobile and small screens -->
+    <header class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <button id="openSidebarBtn" class="lg:hidden p-2 bg-white rounded shadow"><i class="bx bx-menu text-skybrand"></i></button>
+        <div class="flex items-center gap-3">
+          <img id="topLogo" src="logo-small.png" class="w-10 h-10 rounded-full object-cover" onerror="this.src='https://via.placeholder.com/80x80?text=Logo'"/>
+          <div>
+            <div id="helloBanner" class="text-lg font-semibold text-skybrand">AreaHealth</div>
+            <div id="subBanner" class="text-xs text-gray-500">Instant pharmacy connections</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div id="userSummary" class="hidden md:flex items-center gap-3">
+          <img id="avatar" src="logo.png" class="w-10 h-10 rounded-full border" onerror="this.src='https://via.placeholder.com/80x80?text=U'"/>
+          <div class="text-right">
+            <div id="displayNameTop" class="font-semibold text-sm">Guest</div>
+            <div id="displayEmailTop" class="text-xs text-gray-500">guest@example.com</div>
+          </div>
+        </div>
+        <button id="signinBtn" class="bg-skybrand text-white px-3 py-2 rounded">Sign in (Google)</button>
+      </div>
+    </header>
+
+    <!-- Container for panels -->
+    <section id="panels" class="bg-white rounded-lg shadow p-4 min-h-[60vh]">
+
+      <!-- LOGIN PANEL (visible initially) -->
+      <section id="panel-login" class="panel">
+        <div class="max-w-3xl mx-auto">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <img src="logo.png" class="w-36 h-36 rounded-full mx-auto mb-4" onerror="this.src='https://via.placeholder.com/160x160?text=Logo'"/>
+              <h2 class="text-3xl font-bold text-skybrand text-center">Welcome to AreaHealth</h2>
+              <p class="text-gray-600 mt-3 text-center">Sign in with Google to continue — instantly find medicines and reserve/pay at nearby pharmacies.</p>
+            </div>
+            <div class="flex items-center justify-center">
+              <div class="w-full">
+                <button id="googleSignIn" class="w-full bg-white border p-3 rounded flex items-center justify-center gap-3">
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-6 h-6"/>
+                  <span>Sign in with Google</span>
+                </button>
+
+                <div class="mt-4 text-xs text-gray-500">
+                  After signing in you'll see a dashboard, access to scanning, analytics, exports, and admin tools (if your account is an admin).
+                </div>
+                <div id="loginErr" class="mt-3 text-sm text-red-600"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DASHBOARD -->
+      <section id="panel-dashboard" class="panel hidden">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-2xl font-bold text-skybrand" id="dashHello">Hello, Guest</h2>
+            <div class="text-xs text-gray-500" id="dashEmail">guest@example.com</div>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="text-right">
+              <div class="text-xs text-gray-500">Orders</div>
+              <div class="font-semibold text-lg" id="dashboardOrders">0</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-gray-500">Revenue (₦)</div>
+              <div class="font-semibold text-lg" id="dashboardRevenue">0</div>
+            </div>
+            <div>
+              <img id="dashAvatar" src="logo.png" class="w-12 h-12 rounded-full border" onerror="this.src='https://via.placeholder.com/80x80?text=U'"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-sky-50 p-4 rounded">
+            <h4 class="font-semibold text-gray-700">Recent Orders</h4>
+            <ul id="recentOrders" class="mt-3 space-y-2 text-sm text-gray-700 max-h-48 overflow-y-auto"></ul>
+          </div>
+
+          <div class="bg-white p-4 rounded shadow">
+            <h4 class="font-semibold text-gray-700">Top Drugs (by orders)</h4>
+            <canvas id="topDrugsChart" height="200"></canvas>
+          </div>
+
+          <div class="bg-white p-4 rounded shadow">
+            <h4 class="font-semibold text-gray-700">Quick Actions</h4>
+            <div class="mt-3 space-y-2">
+              <button class="w-full p-2 bg-skybrand text-white rounded" onclick="navigateTo('panel-search')">Search Drugs</button>
+              <button class="w-full p-2 border rounded" onclick="navigateTo('panel-scanner')">Open Scanner</button>
+              <button class="w-full p-2 border rounded" onclick="navigateTo('panel-analytics')">Open Analytics</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEARCH -->
+      <section id="panel-search" class="panel hidden">
+        <div class="flex items-center gap-3 mb-4">
+          <input id="searchInput" placeholder="Search drugs, SKU or barcode" class="flex-1 p-3 border rounded" />
+          <button id="searchBtn" class="p-3 bg-skybrand text-white rounded">Search</button>
+        </div>
+        <div id="searchResults" class="space-y-3"></div>
+      </section>
+
+      <!-- MAP (note: small placeholder; replace with Leaflet if desired) -->
+      <section id="panel-map" class="panel hidden">
+        <h3 class="font-semibold text-gray-700 mb-2">Nearby Pharmacies Map</h3>
+        <div id="map" class="bg-gray-100 rounded p-2">Map placeholder — integrate Leaflet or Google Maps and load pharmacies (see earlier examples)</div>
+        <div id="nearbyPharmacies" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+      </section>
+
+      <!-- SCANNER -->
+      <section id="panel-scanner" class="panel hidden">
+        <h3 class="font-semibold text-gray-700 mb-2">Barcode Scanner</h3>
+        <div id="qr-reader" class="w-full rounded border p-2"></div>
+        <div id="qr-result" class="mt-3 text-sm text-gray-700">No scan yet</div>
+        <div class="mt-3 flex gap-2">
+          <button id="startQR" class="p-2 bg-skybrand text-white rounded">Start Scanner</button>
+          <button id="stopQR" class="p-2 border rounded">Stop</button>
+        </div>
+      </section>
+
+      <!-- INVENTORY -->
+      <section id="panel-inventory" class="panel hidden">
+        <h3 class="font-semibold text-gray-700 mb-2">Inventory</h3>
+        <div id="inventoryList" class="space-y-2 max-h-64 overflow-y-auto"></div>
+        <div class="mt-3">
+          <button id="addInventoryBtn" class="p-2 bg-skybrand text-white rounded">Add Item</button>
+        </div>
+      </section>
+
+      <!-- ORDERS -->
+      <section id="panel-orders" class="panel hidden">
+        <h3 class="font-semibold text-gray-700 mb-2">Orders</h3>
+        <div id="ordersList" class="space-y-3 max-h-64 overflow-y-auto"></div>
+      </section>
+
+      <!-- PHARMACIES -->
+      <section id="panel-pharmacies" class="panel hidden">
+        <h3 class="font-semibold text-gray-700 mb-2">Pharmacies</h3>
+        <div id="pharmacyList" class="space-y-3 max-h-72 overflow-y-auto"></div>
+      </section>
+
+      <!-- ANALYTICS -->
+      <section id="panel-analytics" class="panel hidden">
+        <h3 class="font-semibold text-gray-700 mb-2">Admin Analytics</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-white p-4 rounded shadow"><canvas id="ordersChart"></canvas></div>
+          <div class="bg-white p-4 rounded shadow"><canvas id="revenueChart"></canvas></div>
+        </div>
+      </section>
+
+      <!-- EXPORT -->
+      <section id="panel-export" class="panel hidden">
+        <h3 class="font-semibold text-gray-700 mb-2">Export</h3>
+        <table id="exportTable" class="min-w-full bg-white border">
+          <thead>
+            <tr class="bg-sky-50"><th class="p-2 border">Order ID</th><th class="p-2 border">Drug</th><th class="p-2 border">Qty</th><th class="p-2 border">Amount</th></tr>
+          </thead>
+          <tbody id="exportTbody"></tbody>
+        </table>
+        <div class="mt-3 flex gap-2">
+          <button id="exportXls" class="p-2 bg-green-500 text-white rounded">Export Excel</button>
+          <button id="exportPdf" class="p-2 bg-red-500 text-white rounded">Export PDF</button>
+        </div>
+      </section>
+
+      <!-- CHATBOT -->
+      <section id="panel-chatbot" class="panel hidden">
+        <h3 class="font-semibold text-gray-700 mb-2">AI Chatbot (Local Simulator)</h3>
+        <div id="chatWindow" class="bg-gray-50 p-3 rounded h-64 overflow-y-auto space-y-2"></div>
+        <div class="mt-3 flex gap-2">
+          <input id="chatInput" placeholder="Ask about the app, orders or how to use AreaHealth..." class="flex-1 p-2 border rounded" />
+          <button id="chatSend" class="p-2 bg-skybrand text-white rounded">Send</button>
+        </div>
+        <div class="text-xs text-gray-500 mt-2">Note: This is a local simulator. Replace `sendMessageToAI()` with your AI API call (OpenAI, Azure, etc.) for a production chatbot.</div>
+      </section>
+
+      <!-- PROFILE -->
+      <section id="panel-profile" class="panel hidden">
+        <h3 class="font-semibold text-gray-700 mb-2">Profile</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="col-span-1 bg-white p-3 rounded shadow">
+            <img id="profilePic" src="logo.png" class="w-28 h-28 rounded-full mx-auto mb-3" onerror="this.src='https://via.placeholder.com/160x160?text=U'"/>
+            <div id="profileName" class="text-center font-semibold">Guest</div>
+            <div id="profileEmail" class="text-center text-xs text-gray-500">guest@example.com</div>
+          </div>
+          <div class="col-span-2 bg-white p-3 rounded shadow">
+            <h4 class="font-semibold">Account Details</h4>
+            <div class="mt-3 space-y-2">
+              <div><strong>UID:</strong> <span id="profileUID">-</span></div>
+              <div><strong>Role:</strong> <span id="profileRole">patient</span></div>
+              <div><strong>Member since:</strong> <span id="profileSince">-</span></div>
+              <div><strong>Additional Info:</strong> <span id="profileBio">-</span></div>
+            </div>
+            <div class="mt-4">
+              <button id="updateProfileBtn" class="p-2 bg-skybrand text-white rounded">Edit Profile</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </section>
+  </main>
+</div>
+
+<!-- FIREBASE CONFIG - replace with your project's values -->
+<script>
+  const FIREBASE_CONFIG = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+  const PAYSTACK_PUBLIC_KEY = "pk_test_xxxxxxxxxxxxxxxxxxxxxxxxx";
+  const VAPID_KEY = "YOUR_VAPID_KEY_FOR_FCM";
+</script>
+
+<script>
+/* ================= Initialization ================= */
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+const messaging = firebase.messaging();
+
+/* Simple state */
+let currentUser = null;
+let userDoc = null;
+
+/* DOM helpers */
+const panels = document.querySelectorAll('.panel');
+function hideAllPanels() { panels.forEach(p=>p.classList.add('hidden')); }
+function showPanel(id) {
+  hideAllPanels();
+  // map id input to panel ids with prefix
+  const panelId = id.startsWith('panel-') ? id : 'panel-' + id.split('panel-').pop();
+  const el = document.getElementById(panelId);
+  if (el) el.classList.remove('hidden');
+  else console.warn('Panel not found', panelId);
+}
+
+/* Sidebar nav */
+document.querySelectorAll('.nav-btn').forEach(btn=>{
+  btn.addEventListener('click', () => {
+    const panel = btn.getAttribute('data-panel');
+    if (!panel) return;
+    showPanel('panel-' + panel);
+    // mobile close
+    if (window.innerWidth < 1024) document.getElementById('sidebar').classList.add('hidden');
+  });
+});
+
+/* Mobile sidebar toggle */
+document.getElementById('openSidebarBtn').addEventListener('click', ()=> {
+  document.getElementById('sidebar').classList.toggle('hidden');
+});
+
+/* Dark mode toggle */
+const darkToggle = document.getElementById('darkToggle');
+darkToggle.addEventListener('click', ()=> {
+  document.getElementById('body').classList.toggle('dark-bg');
+});
+
+/* Sign-in UI wiring */
+const signinBtn = document.getElementById('signinBtn');
+const googleSignInBtn = document.getElementById('googleSignIn');
+const googleSignInTop = document.getElementById('googleSignIn'); // same button
+signinBtn.addEventListener('click', () => googleSignIn());
+googleSignInBtn && googleSignInBtn.addEventListener('click', () => googleSignIn());
+
+async function googleSignIn() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try {
+    const result = await auth.signInWithPopup(provider);
+    // user signed in
+    console.log('Signed in:', result.user);
+  } catch (e) {
+    document.getElementById('loginErr').textContent = e.message;
+  }
+}
+
+/* Sign out */
+document.getElementById('logout').addEventListener('click', ()=> auth.signOut());
+document.getElementById('logoutBtn').addEventListener('click', ()=> auth.signOut());
+
+/* ================= Auth state change ================= */
+auth.onAuthStateChanged(async (user) => {
+  currentUser = user;
+  if (!user) {
+    // show login panel
+    showPanel('panel-login');
+    // update small UI
+    document.getElementById('miniName').textContent = 'Hello, Guest';
+    document.getElementById('miniEmail').textContent = 'Not signed in';
+    document.getElementById('displayNameTop').textContent = 'Guest';
+    document.getElementById('displayEmailTop').textContent = 'guest@example.com';
+    document.getElementById('profileName').textContent = 'Guest';
+    document.getElementById('profileEmail').textContent = 'guest@example.com';
+    return;
+  }
+
+  // fetch or create user document
+  const udocRef = db.collection('users').doc(user.uid);
+  const udocSnap = await udocRef.get();
+  if (!udocSnap.exists) {
+    // create minimal record
+    await udocRef.set({
+      email: user.email || '',
+      displayName: user.displayName || '',
+      photoURL: user.photoURL || '',
+      role: 'patient',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      bio: ''
+    });
+    userDoc = (await udocRef.get()).data();
+  } else {
+    userDoc = udocSnap.data();
+  }
+
+  // update UI with user info everywhere
+  const name = user.displayName || userDoc.displayName || 'User';
+  const email = user.email || userDoc.email || '';
+  const photo = user.photoURL || userDoc.photoURL || 'logo.png';
+
+  document.getElementById('miniName').textContent = 'Hello, ' + name.split(' ')[0];
+  document.getElementById('miniEmail').textContent = email;
+  document.getElementById('avatar').src = photo;
+  document.getElementById('dashAvatar').src = photo;
+  document.getElementById('profilePic').src = photo;
+  document.getElementById('displayNameTop').textContent = name;
+  document.getElementById('displayEmailTop').textContent = email;
+  document.getElementById('profileName').textContent = name;
+  document.getElementById('profileEmail').textContent = email;
+  document.getElementById('profileUID').textContent = user.uid;
+  document.getElementById('profileRole').textContent = userDoc.role || 'patient';
+  document.getElementById('profileSince').textContent = userDoc.createdAt ? new Date(userDoc.createdAt.seconds*1000).toLocaleDateString() : '-';
+  document.getElementById('profileBio').textContent = userDoc.bio || '-';
+
+  // show dashboard by default
+  showPanel('panel-dashboard');
+  // load dashboard data
+  loadDashboardData();
+  // initialize FCM token for user (save to their doc)
+  try { await initFCM(); } catch(e){ console.warn('FCM init failed', e); }
+});
+
+/* ================= Dashboard data & charts ================= */
+async function loadDashboardData() {
+  // load orders
+  const ordersSnap = await db.collection('orders').orderBy('createdAt', 'desc').limit(10).get();
+  const recentOrdersEl = document.getElementById('recentOrders');
+  recentOrdersEl.innerHTML = '';
+  let totalOrders = 0;
+  let revenue = 0;
+  const drugCounts = {};
+  ordersSnap.forEach(doc=>{
+    const o = doc.data();
+    totalOrders += 1;
+    revenue += (o.amount || 0);
+    const name = o.drugName || 'Unknown';
+    drugCounts[name] = (drugCounts[name] || 0) + (o.qty || 1);
+    const li = document.createElement('li');
+    li.className = 'p-2 bg-white rounded shadow text-sm';
+    li.innerHTML = `<div class="flex justify-between"><div><strong>${o.drugName}</strong> <span class="text-xs text-gray-500">x${o.qty||1}</span></div><div class="text-xs text-gray-500">${o.status||''}</div></div>`;
+    recentOrdersEl.appendChild(li);
+  });
+
+  document.getElementById('dashboardOrders').textContent = totalOrders;
+  document.getElementById('dashboardRevenue').textContent = '₦' + revenue.toLocaleString();
+
+  // top drugs chart
+  const labels = Object.keys(drugCounts).slice(0,10);
+  const data = labels.map(l=>drugCounts[l]);
+  const ctx = document.getElementById('topDrugsChart').getContext('2d');
+  if (window.topDrugsChart) window.topDrugsChart.destroy();
+  window.topDrugsChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets:[{ label:'Units', data, backgroundColor: 'rgba(56,189,248,0.9)' }] }
+  });
+
+  // admin charts: orders over time or revenue (example static transform)
+  renderAdminCharts();
+}
+
+/* admin charts */
+async function renderAdminCharts() {
+  const ordersSnap = await db.collection('orders').orderBy('createdAt','desc').limit(100).get();
+  const byDay = {}; // simple daily aggregation
+  ordersSnap.forEach(d=>{
+    const o = d.data();
+    const ts = o.createdAt ? (o.createdAt.seconds || o.createdAt) : Date.now();
+    const day = new Date(ts*1000).toLocaleDateString();
+    byDay[day] = byDay[day] || { orders:0, revenue:0 };
+    byDay[day].orders += (o.qty||1);
+    byDay[day].revenue += (o.amount || 0);
+  });
+
+  const labels = Object.keys(byDay).slice(0,10).reverse();
+  const ordersData = labels.map(l=> byDay[l].orders );
+  const revenueData = labels.map(l=> byDay[l].revenue );
+
+  const ctx1 = document.getElementById('ordersChart').getContext('2d');
+  if (window.ordersChart) window.ordersChart.destroy();
+  window.ordersChart = new Chart(ctx1, { type:'line', data:{ labels, datasets:[{ label:'Orders', data: ordersData, borderColor:'#0ea5e9', fill:true }] } });
+
+  const ctx2 = document.getElementById('revenueChart').getContext('2d');
+  if (window.revenueChart) window.revenueChart.destroy();
+  window.revenueChart = new Chart(ctx2, { type:'bar', data:{ labels, datasets:[{ label:'Revenue (₦)', data: revenueData, backgroundColor:'#38bdf8' }] } });
+}
+
+/* ================= Search implementation (basic) ================= */
+document.getElementById('searchBtn').addEventListener('click', onSearch);
+async function onSearch(){
+  const q = document.getElementById('searchInput').value.trim();
+  const resultsEl = document.getElementById('searchResults');
+  if (!q) { resultsEl.innerHTML = '<div class="p-3 text-gray-500">Enter search query</div>'; return; }
+  resultsEl.innerHTML = '<div class="p-3 text-gray-500">Searching...</div>';
+
+  try {
+    // try sku exact match first
+    let snap = await db.collection('drugs').where('sku','==',q).limit(20).get();
+    if (snap.empty) {
+      snap = await db.collection('drugs').where('name','>=',q).where('name','<=', q + '\uf8ff').limit(50).get();
+    }
+    if (snap.empty) { resultsEl.innerHTML = '<div class="p-3 text-gray-500">No drugs found</div>'; return; }
+    const list = [];
+    snap.forEach(doc=> list.push({ id: doc.id, ...doc.data() }));
+    // for each drug find inventory offers
+    let html = '';
+    for (const drug of list) {
+      const invSnap = await db.collection('inventory').where('drugId','==',drug.id).where('quantity','>',0).get();
+      const offers = [];
+      invSnap.forEach(i=>offers.push(i.data()));
+      html += renderDrugCard(drug, offers);
+    }
+    resultsEl.innerHTML = html;
+  } catch (e) {
+    resultsEl.innerHTML = `<div class="p-3 text-red-600">Search error: ${e.message}</div>`;
+  }
+}
+
+function renderDrugCard(drug, offers) {
+  let offersHtml = '';
+  if (!offers.length) offersHtml = '<div class="text-sm text-gray-500 p-2">No pharmacy has this item</div>';
+  else offersHtml = offers.map(o=>`<div class="p-2 border rounded mb-2 flex justify-between"><div><div class="font-semibold text-skybrand">${o.pharmacyName}</div><div class="text-xs text-gray-500">${o.address||''}</div></div><div class="text-right"><div class="font-bold">₦${o.price}</div><div class="text-xs text-gray-500">Qty: ${o.quantity}</div><button class="mt-2 px-2 py-1 bg-skybrand text-white rounded text-xs" onclick="reserveFromOffer('${o.pharmacyId}','${o.pharmacyName}','${o.drugId||drug.id}','${drug.name}',${o.price})">Reserve</button></div></div>`).join('');
+  return `<div class="p-3 bg-white rounded shadow mb-3"><div class="flex items-center justify-between"><div><div class="font-semibold">${drug.name}</div><div class="text-xs text-gray-500">${drug.brand||''} • ${drug.strength||''}</div></div><div class="text-sm text-gray-500">SKU: ${drug.sku||'-'}</div></div><div class="mt-3">${offersHtml}</div></div>`;
+}
+
+/* ================= Reserve / Order flows ================= */
+async function reserveFromOffer(pharmacyId, pharmacyName, drugId, drugName, price) {
+  if (!currentUser) return alert('Please sign in to reserve');
+  const qty = parseInt(prompt('Quantity', '1')) || 1;
+  const order = {
+    userId: currentUser.uid,
+    pharmacyId,
+    pharmacyName,
+    drugId,
+    drugName,
+    qty,
+    amount: price * qty,
+    status: 'reserved',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  const docRef = await db.collection('orders').add(order);
+  alert('Reserved. Order ID: ' + docRef.id);
+  loadDashboardData();
+}
+
+/* ================= Export functions ================= */
+document.getElementById('exportXls').addEventListener('click', async ()=>{
+  const snap = await db.collection('orders').limit(500).get();
+  const rows = snap.docs.map(d=>({ id: d.id, ...d.data() }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Orders');
+  XLSX.writeFile(wb, 'areahealth_orders.xlsx');
+});
+document.getElementById('exportPdf').addEventListener('click', async ()=>{
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const snap = await db.collection('orders').limit(500).get();
+  const data = snap.docs.map(d=>{
+    const o = d.data();
+    return [d.id, o.drugName || '-', o.qty || 0, o.amount || 0, o.status || '-'];
+  });
+  doc.text('AreaHealth Orders', 10, 10);
+  doc.autoTable({ head:[['Order ID','Drug','Qty','Amount','Status']], body: data, startY: 18 });
+  doc.save('orders_report.pdf');
+});
+
+/* ================= Barcode scanning (html5-qrcode) ================= */
+let html5QrCode = null;
+document.getElementById('startQR').addEventListener('click', async ()=>{
+  const qrRegionId = 'qr-reader';
+  html5QrCode = new Html5Qrcode(qrRegionId);
+  const config = { fps: 10, qrbox: 250 };
+  try {
+    await html5QrCode.start({ facingMode: "environment" }, config, qrMessage => {
+      document.getElementById('qr-result').textContent = 'Scanned: ' + qrMessage;
+      // set search input and perform search automatically (useful)
+      document.getElementById('searchInput').value = qrMessage;
+      onSearch();
+    });
+  } catch (err) {
+    alert('Scanner start failed: ' + err);
+  }
+});
+document.getElementById('stopQR').addEventListener('click', async ()=> {
+  if (html5QrCode) {
+    await html5QrCode.stop();
+    html5QrCode.clear();
+    html5QrCode = null;
+    document.getElementById('qr-result').textContent = 'Stopped';
+  }
+});
+
+/* ================= Orders list viewer ================= */
+async function loadOrdersList(){
+  const snap = await db.collection('orders').where('userId','==', currentUser.uid).orderBy('createdAt','desc').get();
+  const el = document.getElementById('ordersList'); el.innerHTML = '';
+  snap.forEach(doc=>{
+    const o = doc.data();
+    const div = document.createElement('div');
+    div.className = 'p-3 bg-white rounded shadow';
+    div.innerHTML = `<div class="flex justify-between"><div><strong>${o.drugName}</strong><div class="text-xs text-gray-500">${o.pharmacyName||''}</div></div><div class="text-sm text-gray-500">${o.status||''}</div></div><div class="mt-2 text-xs text-gray-600">Amount: ₦${o.amount||0}</div>`;
+    el.appendChild(div);
+  });
+}
+
+/* ================= Nearby pharmacies (placeholder loader) ================= */
+async function loadPharmacies(){
+  const snap = await db.collection('pharmacies').limit(50).get();
+  const el = document.getElementById('pharmacyList'); el.innerHTML = '';
+  snap.forEach(doc=>{
+    const p = doc.data();
+    const div = document.createElement('div');
+    div.className = 'p-2 bg-white rounded shadow flex justify-between items-center';
+    div.innerHTML = `<div><div class="font-semibold">${p.name}</div><div class="text-xs text-gray-500">${p.address||''}</div></div><div class="text-xs text-gray-500">${p.phone||''}</div>`;
+    el.appendChild(div);
+  });
+}
+
+/* ================= AI Chatbot (local simulator) ================= */
+function appendChat(role, text) {
+  const win = document.getElementById('chatWindow');
+  const div = document.createElement('div');
+  div.className = role === 'user' ? 'text-right' : 'text-left';
+  div.innerHTML = `<div class="${role==='user'?'inline-block bg-sky-200':'inline-block bg-white'} p-2 rounded">${text}</div>`;
+  win.appendChild(div);
+  win.scrollTop = win.scrollHeight;
+}
+
+async function sendMessageToAI(message) {
+  // Local simulated responses (replace with remote AI API)
+  appendChat('user', message);
+  appendChat('bot', 'Thinking...');
+  // simulate delay
+  await new Promise(r=>setTimeout(r, 800));
+  // simple rule-based replies
+  let reply = "Sorry, I didn't understand. Try: 'How to reserve', 'How to pay', 'View orders'.";
+  const m = message.toLowerCase();
+  if (m.includes('reserve') || m.includes('order')) reply = "To reserve: search a drug, tap 'Reserve' on an offer. You must be logged in.";
+  if (m.includes('pay')) reply = "We use Paystack for payments. When you click Pay, Paystack inline pop-up will appear. Use test keys for testing.";
+  if (m.includes('scanner')) reply = "Open the Barcode Scan panel and allow access to your camera to scan barcodes.";
+  // replace the thinking text with reply (naive)
+  const win = document.getElementById('chatWindow');
+  // remove last 'Thinking...' bubble
+  const bubbles = win.querySelectorAll('div');
+  if (bubbles.length) bubbles[bubbles.length-1].remove();
+  appendChat('bot', reply);
+}
+
+document.getElementById('chatSend').addEventListener('click', ()=>{
+  const txt = document.getElementById('chatInput').value.trim();
+  if (!txt) return;
+  document.getElementById('chatInput').value = '';
+  sendMessageToAI(txt);
+});
+
+/* ================= FCM (push) - client init ================= */
+async function initFCM(){
+  try {
+    await Notification.requestPermission();
+    const token = await messaging.getToken({ vapidKey: VAPID_KEY });
+    console.log('FCM token', token);
+    // save to user doc so server can target
+    if (currentUser) await db.collection('users').doc(currentUser.uid).update({ fcmToken: token }).catch(()=>{});
+    messaging.onMessage(payload => {
+      console.log('Message received (foreground):', payload);
+      const title = payload.notification?.title || 'AreaHealth';
+      const body = payload.notification?.body || '';
+      try {
+        new Notification(title, { body });
+      } catch(e) {
+        alert(title + '\n' + body);
+      }
+    });
+  } catch(e) { console.warn('FCM error', e.message); }
+}
+
+/* ================= Paystack inline example (frontend) ================= */
+function payWithPaystack(orderId, amountNaira, email){
+  const handler = PaystackPop && PaystackPop.setup ? PaystackPop.setup({
+    key: PAYSTACK_PUBLIC_KEY,
+    email: email || (currentUser && currentUser.email) || '',
+    amount: Math.round(amountNaira * 100),
+    metadata: { custom_fields: [{ display_name: 'Order ID', variable_name: 'order_id', value: orderId }] },
+    callback: async function(response){
+      alert('Payment successful: ' + response.reference);
+      // update order in Firestore if you created one earlier
+      if (orderId) {
+        await db.collection('orders').doc(orderId).update({ status:'paid', paystackRef: response.reference, paidAt: firebase.firestore.FieldValue.serverTimestamp() });
+      }
+    },
+    onClose: function(){ alert('Payment closed'); }
+  }) : null;
+  if (handler) handler.openIframe();
+  else alert('Paystack not available. Include Paystack script.');
+}
+
+/* ================= Utility: navigate to named panel ================= */
+function navigateTo(panelId){
+  // convenience wrapper used by buttons
+  showPanel(panelId);
+}
+
+/* ================= Populate initial placeholders & wire some buttons ================= */
+document.addEventListener('DOMContentLoaded', ()=>{
+  // show login by default
+  showPanel('panel-login');
+
+  // wire search input Enter
+  document.getElementById('searchInput').addEventListener('keydown', (e)=> { if (e.key==='Enter') onSearch(); });
+
+  // wire inventory add button
+  document.getElementById('addInventoryBtn').addEventListener('click', async ()=>{
+    if (!currentUser) return alert('Sign in to add inventory.');
+    const name = prompt('Drug name');
+    if (!name) return;
+    const price = parseFloat(prompt('Price (₦)', '0'));
+    const qty = parseInt(prompt('Quantity', '1')) || 1;
+    // simple: add to drugs & inventory
+    const drugRef = await db.collection('drugs').add({ name, brand:'', sku:'', price });
+    // find or create pharmacy for user (simple: first owned)
+    const phSnap = await db.collection('pharmacies').where('ownerId','==', currentUser.uid).limit(1).get();
+    let phId;
+    if (phSnap.empty) {
+      const p = await db.collection('pharmacies').add({ name: currentUser.displayName+"'s Pharmacy", ownerId: currentUser.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      phId = p.id;
+    } else phId = phSnap.docs[0].id;
+    await db.collection('inventory').add({ pharmacyId: phId, pharmacyName: currentUser.displayName+"'s Pharmacy", drugId: drugRef.id, name, price, quantity: qty, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    alert('Inventory added');
+    loadDashboardData();
+  });
+
+  // wire panels for small screens (nav)
+  document.querySelectorAll('[data-panel]').forEach(b=>{
+    b.addEventListener('click', ()=> {
+      const panel = b.getAttribute('data-panel');
+      showPanel('panel-' + panel);
+    });
+  });
+
+  // wire export table population when export panel is opened
+  // observer or simple trigger: populate on open
+  // handled via showing panels and load functions (not all coded to avoid huge bloat)
+});
+
+/* ================= Small helpful functions to refresh lists when needed ================= */
+async function refreshAllLists(){
+  await loadDashboardData();
+  await loadOrdersList();
+  await loadPharmacies();
+}
+
+/* call it occasionally after actions */
+window.refreshAllLists = refreshAllLists;
+
+</script>
+
+<!-- ================= Paystack webhook example (server-side Node.js - comment) =================
+Save to server (e.g. Express) and use your Paystack secret to verify.
+const express = require('express');
+const crypto = require('crypto');
+const admin = require('firebase-admin'); // optional: update Firestore directly
+admin.initializeApp();
+
+const app = express();
+app.use(express.json({ limit: '1mb' }));
+
+const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET;
+
+app.post('/paystack-webhook', (req, res) => {
+  const signature = req.headers['x-paystack-signature'];
+  const payload = JSON.stringify(req.body);
+  const expected = crypto.createHmac('sha512', PAYSTACK_SECRET).update(payload).digest('hex');
+  if (signature !== expected) return res.status(401).send('Invalid signature');
+
+  const event = req.body;
+  if (event.event === 'charge.success') {
+    const data = event.data;
+    const orderId = (data.metadata && data.metadata.custom_fields && data.metadata.custom_fields.find(f=>f.variable_name==='order_id')||{}).value;
+    if (orderId) {
+      admin.firestore().collection('orders').doc(orderId).update({ status: 'paid', paystackRef: data.reference, paidAt: admin.firestore.FieldValue.serverTimestamp() });
+    }
+  }
+  res.sendStatus(200);
+});
+
+app.listen(4000, ()=>console.log('Webhook listening on 4000'));
+========================================================================== -->
+
+<!-- ================= firebase-messaging-sw.js example (deploy to your site root) =================
+importScripts('https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/11.0.1/firebase-messaging-compat.js');
+firebase.initializeApp({
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
+});
+const messaging = firebase.messaging();
+messaging.onBackgroundMessage(function(payload) {
+  const title = payload.notification?.title || 'AreaHealth';
+  const options = { body: payload.notification?.body || '', icon: '/icons/icon-192.png' };
+  self.registration.showNotification(title, options);
+});
+========================================================================== -->
+
+</body>
+</html>
